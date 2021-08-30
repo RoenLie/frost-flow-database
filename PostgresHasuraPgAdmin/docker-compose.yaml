@@ -1,37 +1,59 @@
 version: '3.6'
 services:
   postgres:
+    container_name: postgres_container
     image: postgres:12
-    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      PGDATA: /data/postgres
     volumes:
-    - db_data:/var/lib/postgresql/data
-    environment:
-      POSTGRES_PASSWORD: postgrespassword
-  pgadmin:
-    image: dpage/pgadmin4
-    restart: always
-    depends_on:
-    - postgres
+      - ./data/postgres:/data/postgres
     ports:
-    - 5050:80
-    ## you can change pgAdmin default username/password with below environment variables
+      - "5432:5432"
+    networks:
+      - postgres
+    restart: unless-stopped
+
+  pgadmin:
+    container_name: pgadmin_container
+    image: dpage/pgadmin4
     environment:
-      PGADMIN_DEFAULT_EMAIL: pgadmin@example.com
-      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-pgadmin@pgadmin.org}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+       - pgadmin:/root/.pgadmin
+    depends_on:
+      - "postgres"
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    networks:
+      - postgres
+    restart: unless-stopped
+
   graphql-engine:
     image: hasura/graphql-engine:v1.3.3
+    restart: unless-stopped
+    networks:
+      - postgres
     ports:
-    - "8080:8080"
+      - "8080:8080"
     depends_on:
-    - "postgres"
-    restart: always
+      - "postgres"
     environment:
-      HASURA_GRAPHQL_DATABASE_URL: postgres://postgres:postgrespassword@postgres:5432/postgres
+      HASURA_GRAPHQL_DATABASE_URL: postgres://postgres:changeme@postgres:5432/postgres
       ## enable the console served by server
       HASURA_GRAPHQL_ENABLE_CONSOLE: "true" # set to "false" to disable console
       ## enable debugging mode. It is recommended to disable this in production
       HASURA_GRAPHQL_DEV_MODE: "true"
       ## uncomment next line to set an admin secret
       # HASURA_GRAPHQL_ADMIN_SECRET: myadminsecretkey
+
+networks:
+  postgres:
+    driver: bridge
+
 volumes:
-  db_data:
+    postgres:
+    pgadmin:
